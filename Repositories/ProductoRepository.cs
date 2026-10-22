@@ -88,7 +88,7 @@ namespace SistemaInventario.Repositories
         }
         public async Task DeleteProductoAsync(Producto producto)
         {
-            producto.Estado = false;
+            producto.Estado = !producto.Estado;
             _context.Productos.Update(producto);
              await _context.SaveChangesAsync();
 

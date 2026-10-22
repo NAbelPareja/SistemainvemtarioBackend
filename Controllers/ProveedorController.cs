@@ -35,10 +35,16 @@ namespace SistemaInventario.Controllers
             return Ok(proveedorDatos);
         }
 
-        [HttpGet("Id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<Proveedor>> GetId(int id)
         {
             var proveedores = await _proveedorRepository.GetProveedorId(id);
+
+            if (proveedores == null)
+            {
+                return BadRequest("El valor de id no es valido o no existe");
+            }
+
             var proveedorDatos = new ProveedorDto
             {
                 Id = proveedores.IdProveedor,
@@ -77,7 +83,7 @@ namespace SistemaInventario.Controllers
             return CreatedAtAction(nameof(GetAll), new { id = proveedorEntity.IdProveedor }, proveedor);
         }
 
-        [HttpPut]
+        [HttpPut("{Id}")]
         public async Task<ActionResult> Update(int id, [FromBody] ProveedorUpdateDto proveedor)
         {
             if (id != proveedor.Id)
@@ -99,26 +105,7 @@ namespace SistemaInventario.Controllers
             return NoContent();
         }
 
-        [HttpPut("Estado")]
-        public async Task<ActionResult> Update(int id, [FromBody] bool estado)
-        {
-            if (id <=0)
-            {
-                return BadRequest("El id es valor no valido");
-            }
-            var proveedorExist = await _proveedorRepository.ProveedorExistAsync(id);
-            if (proveedorExist == null)
-            {
-                return NotFound("El proveedor no existe.");
-            }
-
-            proveedorExist.Estado = estado;
-            await _proveedorRepository.UpdateAsync(proveedorExist);
-            return NotFound();
-
-        }
-
-        [HttpDelete]
+        [HttpDelete("{Id}")]
         public async Task<ActionResult> Delete(int id)
         {
             var proveedorExist = await _proveedorRepository.ProveedorExistAsync(id);

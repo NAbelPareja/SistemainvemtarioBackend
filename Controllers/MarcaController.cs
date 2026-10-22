@@ -27,22 +27,29 @@ namespace SistemaInventario.Controllers
             {
                 IdMarca = m.IdMarca,
                 Nombre = m.Nombre,
-                Descripcion = m.Descripcion
+                Descripcion = m.Descripcion,
+                Estado = m.Estado
             }).ToList();
 
             return Ok(marcaDatos);
         }
 
-        [HttpGet("Id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<Marca>> GetId(int id)
         {
             var marcas = await _marcaRepository.GetMarcaId(id);
+
+            if (marcas == null)
+            {
+                return BadRequest("El id ingresado no existe o no es valido");
+            }
 
             var marcaDatos =  new MarcaDto
             {
                 IdMarca = marcas.IdMarca,
                 Nombre = marcas.Nombre,
-                Descripcion = marcas.Descripcion
+                Descripcion = marcas.Descripcion,
+                Estado = marcas.Estado
             };
 
             return Ok(marcaDatos);
@@ -64,14 +71,15 @@ namespace SistemaInventario.Controllers
             var marca = new Marca
             {
                 Nombre = marcaDto.Nombre,
-                Descripcion = marcaDto.Descripcion
+                Descripcion = marcaDto.Descripcion,
+                Estado = true
             };
             await _marcaRepository.AddAsync(marca);
             return CreatedAtAction(nameof(GetAll), new { id = marca.IdMarca }, marca);
         }
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpPut]
+        [HttpPut("{Id}")]
         public async Task<ActionResult> Update(int id, [FromBody] MarcaUpdateDto marcaDto)
         {
             if (id != marcaDto.IdMarca)
@@ -90,7 +98,7 @@ namespace SistemaInventario.Controllers
         }
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpDelete]
+        [HttpDelete("{Id}")]
         public async Task<ActionResult> Delete(int id)
         {
             var marcaExist = await _marcaRepository.MarcaExistAsync(id);

@@ -32,7 +32,7 @@ namespace SistemaInventario.Controllers
             return Ok(categoriaDatos);
         }
 
-        [HttpGet("Id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<Categorium>> GetId(int id)
         {
             var categorias = await _categoriaRepository.GetCategoriaId(id);
@@ -72,7 +72,7 @@ namespace SistemaInventario.Controllers
         }
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpPut]
+        [HttpPut("{Id}")]
         public async Task<ActionResult> Update(int id, [FromBody] CategoriaUpdateDto categoria)
         {
             if (id != categoria.Id)
@@ -92,26 +92,9 @@ namespace SistemaInventario.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpPut("Estado")]
-        public async Task<ActionResult> Update(int id, [FromBody] bool estado)
-        {
-            if (id<= 0 )
-            {
-                BadRequest("Valor ingresado no valido");
-            }
-            var categoriaExist = await _categoriaRepository.CategoriaExistAsync(id);
-            if (categoriaExist == null)
-            {
-                return NotFound("La categoría no existe.");
-            }
-            categoriaExist.Estado = estado;
-            await _categoriaRepository.UpdateAsync(categoriaExist);
-            return NoContent();
-        }
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpDelete]
+        [HttpDelete("{Id}")]
         public async Task<ActionResult> Delete(int id)
         {
             var categoriaExist = await _categoriaRepository.CategoriaExistAsync(id);

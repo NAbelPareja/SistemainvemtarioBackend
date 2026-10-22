@@ -26,7 +26,8 @@ namespace SistemaInventario.Controllers
             {
                 Id = r.IdRol,
                 Nombre = r.Nombre,
-                Descripcion = r.Descripcion
+                Descripcion = r.Descripcion,
+                Estado = r.Estado
             });
             return Ok(rol);
         }
@@ -48,13 +49,14 @@ namespace SistemaInventario.Controllers
             {
                 Nombre = rolDto.Nombre,
                 Descripcion = rolDto.Descripcion
+
             };
 
             _rolRepository.AddAsync(rol);
             return CreatedAtAction(nameof(GetAll), new { id = rol.IdRol }, rol);
         }
 
-        [HttpPut]
+        [HttpPut("{Id}")]
         public async Task<ActionResult> Update(int id, [FromBody] RolUpdateDto roldto)
         {
             if (id != roldto.Id)
@@ -76,7 +78,7 @@ namespace SistemaInventario.Controllers
             return NoContent();
 
         }
-        [HttpDelete]
+        [HttpDelete("{Id}")]
         public async Task<ActionResult> Delete(int id)
         {
             var rolExist = await _rolRepository.RolexistAsync(id);

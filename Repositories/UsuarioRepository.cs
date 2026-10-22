@@ -21,9 +21,9 @@ namespace SistemaInventario.Repositories
             return await _context.Usuarios.Include(b => b.IdRolNavigation).FirstOrDefaultAsync(u => u.IdUsuario == id);
         }
 
-        public async Task<bool> NameExistAsync(string name)
+        public async Task<bool> NameExistAsync(string correo)
         {
-            return await _context.Usuarios.AnyAsync(u => u.Nombre == name);
+            return await _context.Usuarios.AnyAsync(u => u.Correo == correo);
         }
 
         public async Task<Usuario?> UsuarioExistAsync(int id)
@@ -50,7 +50,7 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Usuario usuario)
         {
-            usuario.Estado = false;
+            usuario.Estado = !usuario.Estado;
             _context.Usuarios.Update(usuario);
             await _context.SaveChangesAsync();
         }

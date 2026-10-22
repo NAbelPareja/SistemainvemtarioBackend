@@ -44,7 +44,7 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Proveedor proveedor)
         {
-            proveedor.Estado = false;
+            proveedor.Estado = !proveedor.Estado;
             _context.Proveedors.Update(proveedor);
             await _context.SaveChangesAsync();
         }

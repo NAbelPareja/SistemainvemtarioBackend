@@ -33,10 +33,15 @@ namespace SistemaInventario.Controllers
             return Ok(almacenDatos);
         }
           
-        [HttpGet("Id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<IEnumerable<AlmacenDto>>> GetId(int id)
         {
             var almacenes = await _almacenRepository.GetAlmacenId(id);
+
+            if (almacenes == null)
+            {
+                return BadRequest("El almacen no existe o el id es invalido");
+            }
             var almacenDatos =  new AlmacenDto
             {
                 Id = almacenes.IdAlmacen,
@@ -65,13 +70,13 @@ namespace SistemaInventario.Controllers
                 Nombre = almacen.Nombre,
                 Direccion = almacen.Direccion,
                 Descripcion = almacen.Descripcion,
-                Estado = almacen.Estado
+                Estado = true
             };
             await _almacenRepository.AddAsync(almacenEntity);
             return CreatedAtAction(nameof(GetAll), new { id = almacenEntity.IdAlmacen }, almacen);
         }
 
-        [HttpPut]
+        [HttpPut("{id}")]
         public async Task<ActionResult> Update(int id, [FromBody] AlmacenUpdateDto almacen)
         {
             if (id != almacen.Id)
@@ -86,29 +91,11 @@ namespace SistemaInventario.Controllers
             almacenExist.Nombre = almacen.Nombre;
             almacenExist.Direccion = almacen.Direccion;
             almacenExist.Descripcion = almacen.Descripcion;
-            almacenExist.Estado = almacen.Estado;
             await _almacenRepository.UpdateAsync(almacenExist);
             return NoContent();
         }
 
-        [HttpPut("Estado")]
-        public async Task<ActionResult> Update(int id, [FromBody] bool estado)
-        {
-            if (id <=0)  
-            {
-                BadRequest("Valor ingresado no valido");
-            }
-            var almacenExist = await _almacenRepository.AlmacenExistAsync(id);
-            if (almacenExist == null)
-            {
-                return NotFound("El almacén no existe.");
-            }
-            almacenExist.Estado = estado;
-            await _almacenRepository.UpdateAsync(almacenExist);
-            return NotFound();
-        }
-
-        [HttpDelete]
+        [HttpDelete("{Id}")]
         public async Task<ActionResult> Delete(int id)
         {
             var almacenExist = await _almacenRepository.AlmacenExistAsync(id);

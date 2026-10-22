@@ -38,6 +38,45 @@ namespace SistemaInventario.Repositories
             return await _context.Venta.AnyAsync(v=>v.IdVenta == id);
         }
 
+        public async Task<bool> UsuarioActivoAsync(int idUsuario)
+        {
+            var usuario = await _context.Usuarios.AnyAsync(u => u.IdUsuario == idUsuario && u.Estado == true);
+            return usuario; // Retorna true si el usuario existe y está activo
+        }
+
+        public async Task<Ventum> VentaExistasync(int id)
+        {
+            var venta =  await _context.Venta.Include(v => v.DetalleVenta).FirstOrDefaultAsync(v => v.IdVenta == id);
+            return venta;
+        }
+
+        public async Task<Inventario> ObetenerInventario(DetalleVentum detalle)
+        {
+            return await _context.Inventarios.FirstOrDefaultAsync(i =>
+                    i.IdProducto == detalle.IdProducto &&
+                    i.IdAlmacen == detalle.IdAlmacen);
+        }
+        public async Task SaveChangesAsync()
+        {
+            // Llama al método nativo de Entity Framework para confirmar los cambios en SQL Server
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> AlmacenActivoAsync(int id)
+        {
+            return await _context.Almacens.AnyAsync(a => a.IdAlmacen == id && a.Estado == true);
+        }
+
+        public async Task<bool> ProductoActivoAsync(int id)
+        {
+            return await _context.Productos.AnyAsync(p => p.IdProducto == id && p.Estado == true);
+        }
+
+        public async Task<Inventario?> InventarioExist(int idAlamcen, int idProducto)
+        {
+            return await _context.Inventarios.FirstOrDefaultAsync(i => i.IdAlmacen == idAlamcen && i.IdProducto == idProducto);
+        }
+
         public async Task Insert(Ventum venta)
         {
             // 1. Iniciamos una transacción "Todo o Nada" para asegurar consistencia

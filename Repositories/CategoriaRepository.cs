@@ -45,7 +45,7 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Categorium categoria)
         {
-            categoria.Estado = false;
+            categoria.Estado = !categoria.Estado;
             _context.Categoria.Update(categoria);
             await _context.SaveChangesAsync();
         }

@@ -40,6 +40,27 @@ namespace SistemaInventario.Repositories
             return await _context.Compras.AnyAsync(d => d.ComprobanteReferencia != null &&  d.ComprobanteReferencia.ToLower() == comprovante.ToLower());
         }
 
+        public async Task<bool> UsuarioActivoAsync(int idUsuario)
+        {
+            var usuario = await _context.Usuarios.AnyAsync(u => u.IdUsuario == idUsuario && u.Estado == true);
+            return usuario; // Retorna true si el usuario existe y está activo
+        }
+
+        public async Task<bool> ProveedorActivoAsync(int id)
+        {
+            return await _context.Proveedors.AnyAsync(p => p.IdProveedor == id && p.Estado == true);
+        }
+
+        public async Task<bool> AlmacenActivoAsync(int id)
+        {
+            return await _context.Almacens.AnyAsync(a => a.IdAlmacen == id && a.Estado == true);
+        }
+
+        public async Task<bool> ProductoActivoAsync(int id)
+        {
+            return await _context.Productos.AnyAsync(p => p.IdProducto == id && p.Estado == true);
+        }
+
         public async Task Insert(Compra compra)
         {
             // 1. Iniciamos una transacción "Todo o Nada" para asegurar consistencia
@@ -104,6 +125,26 @@ namespace SistemaInventario.Repositories
                 throw; // Relanzamos el error para que llegue al controlador
             }
         }
+
+        public async Task<Compra?> GetCompraConDetallesAsync(int id)
+        {
+            return await _context.Compras
+                .Include(c => c.DetalleCompras) // <-- Asegúrate de que coincida con el nombre de tu propiedad de navegación
+                .FirstOrDefaultAsync(c => c.IdCompra == id);
+        }
+
+        public async Task<Inventario?> GetInventarioAsync(int idProducto, int idAlmacen)
+        {
+            return await _context.Inventarios
+                .FirstOrDefaultAsync(inv => inv.IdProducto == idProducto && inv.IdAlmacen == idAlmacen);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            // Llama al método nativo de Entity Framework para confirmar los cambios en SQL Server
+            await _context.SaveChangesAsync();
+        }
+
 
 
 

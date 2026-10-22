@@ -46,13 +46,13 @@ namespace SistemaInventario.Controllers
             return Ok(usuariosList);
         }
 
-        [HttpGet("id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<UsuarioDto>> GetId(int id)
         {
             var usuarios = await _usuarioRepository.GetUsuarioID(id);
             if (usuarios == null)
             {
-                BadRequest("El id ingresado no existe o no contiene datos");
+                return BadRequest("El id ingresado no existe o no contiene datos");
             }
             var usuariosList =  new UsuarioDto
             {
@@ -106,6 +106,18 @@ namespace SistemaInventario.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(usuario.Contraseña, user.PasswordHash))
             {
                 return Unauthorized("El correo electrónico o la contraseña son incorrectos.");
+            }
+
+            // 🔒 LA ADUANA DEL ESTADO:
+            if (user.Estado == false)
+            {
+                return Forbid("Tu cuenta ha sido desactivada. Comunícate con el administrador."); // Retorna un 403 Forbidden
+            }
+
+            // 🔒 LA ADUANA DEL ROL DESACTIVADO:
+            if (user.IdRolNavigation.Estado != null && user.IdRolNavigation.Estado == false)
+            {
+                return Forbid("El rol asociado a tu cuenta está inactivo temporalmente.");
             }
 
             // Generar token JWT
@@ -163,25 +175,6 @@ namespace SistemaInventario.Controllers
                 string passwordHash = BCrypt.Net.BCrypt.HashPassword(usuario.Contraseña);
                 existingUsuario.PasswordHash = passwordHash;
             }
-            await _usuarioRepository.UpdateAsync(existingUsuario);
-            return NoContent();
-        }
-
-        [HttpPut("Estado")]
-        public async Task<ActionResult> Update(int id, [FromBody] bool estado)
-        {
-            if (id <= 0)
-            {
-                BadRequest("El id es no valido");
-            }
-
-            var existingUsuario = await _usuarioRepository.UsuarioExistAsync(id);
-            if (existingUsuario == null)
-            {
-                return NotFound("El usuario no existe.");
-            }
-            existingUsuario.Estado = estado;
-
             await _usuarioRepository.UpdateAsync(existingUsuario);
             return NoContent();
         }

@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SistemaInventario.DTO;
 using SistemaInventario.Models;
 using SistemaInventario.Repositories;
+using System.Security.Claims;
 
 namespace SistemaInventario.Controllers
 {
@@ -52,7 +54,7 @@ namespace SistemaInventario.Controllers
             }).ToList();
             return Ok(comprasDto);
         }
-        [HttpGet("id")]
+        [HttpGet("{Id}")]
         public async Task<ActionResult<VentaDto>> GetID(int id)
         {
             var venta = await _ventaRepository.GetId(id);
@@ -91,36 +93,71 @@ namespace SistemaInventario.Controllers
         }
 
         [HttpPost("Registrar")]
-        public async Task<IActionResult> RegistrarCompra([FromBody] VentaInsertDto dto)
+        public async Task<IActionResult> RegistrarVenta([FromBody] VentaInsertDto dto)
         {
+            // 1. Extraes el ID del usuario logueado desde los Claims del Token JWT
+            var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+            // 2. Compruebas el estado actual en la Base de Datos (en tiempo real)
+            var usuarioActivo = await  _ventaRepository.UsuarioActivoAsync(usuarioId);
+
+            if (!usuarioActivo)
+            {
+                return Unauthorized("Tu usuario ya no se encuentra activo en el sistema.");
+            }
+
             // 1. Validar que el JSON no venga vacío
-            if (dto == null || !dto.Detalles.Any())
+            if (dto == null || dto.Detalles.Count == 0)
             {
                 return BadRequest("La compra debe contener al menos un producto en el detalle.");
             }
 
+            // 🔒 2. ¡EL TRUCO DE SEGURIDAD! Extraes el ID directamente del Token JWT
+            // Revisa cómo llamaste al Claim en tu TokenService (NameIdentifier o Name)
+            var claimUsuarioId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(claimUsuarioId))
+            {
+                return Unauthorized("No se pudo identificar al usuario logueado a través del token.");
+            }
+
+            int usuarioLogueadoId = int.Parse(claimUsuarioId);
 
             // 3. Mapear de forma limpia el DTO Maestro-Detalle hacia tus Entidades Reales de la BD
             var nuevaVenta = new Ventum
             {
-                IdUsuarioRegistro = dto.IdUsuarioRegistro, // Vinculamos el usuario auditor
+                IdUsuarioRegistro = usuarioLogueadoId, // Vinculamos el usuario auditor
                 FechaVenta = DateTime.Now,
                 Estado = "Procesado",
                 // Calculamos el Total sumando los subtotales de forma matemática en memoria
-                Total = dto.Detalles.Sum(d => d.Cantidad * d.PrecioUnitario)
+                Total = dto.Total,
             };
+
+
 
             // 4. Mapeamos la lista interna de detalles recorriendo el DTO de React
             foreach (var item in dto.Detalles)
             {
-                var detalleEntidad = new DetalleVentum
+                // 🔒 Aduana del Almacén de destino
+                if (!await _ventaRepository.AlmacenActivoAsync(item.IdAlmacen))
                 {
+                    return BadRequest($"El almacén con ID {item.IdAlmacen} no existe o está inactivo.");
+                }
+
+                // 🔒 Aduana del Producto
+                if (!await _ventaRepository.ProductoActivoAsync(item.IdProducto))
+                {
+                    return BadRequest($"El producto con ID {item.IdProducto} no existe o está descontinuado.");
+                }
+
+                    var detalleEntidad = new DetalleVentum
+                {
+
                     IdProducto = item.IdProducto,
                     IdAlmacen = item.IdAlmacen, // Destino físico del stock
                     Cantidad = item.Cantidad,
                     PrecioUnitario = item.PrecioUnitario
                 };
-
                 // Agregamos el hijo a la propiedad de navegación de la cabecera
                 nuevaVenta.DetalleVenta.Add(detalleEntidad);
             }
@@ -135,6 +172,32 @@ namespace SistemaInventario.Controllers
             {
                 return StatusCode(500, $"Error interno al procesar la logística: {ex.Message}");
             }
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> AnularVenta(int id)
+        {
+            var venta = await _ventaRepository.VentaExistasync(id);
+            if (venta == null) return NotFound("La venta no existe.");
+
+            if (venta.Estado == "Anulado") return BadRequest("Esta venta ya se encuentra anulada.");
+
+            // 🔄 Tu borrado lógico transaccional:
+            venta.Estado = "Anulado";
+
+            // 🛒 REVERSIÓN DE STOCK (Kardex): 
+            // Recorres los detalles para devolver la mercadería al almacén
+            foreach (var detalle in venta.DetalleVenta)
+            {
+                var inventario = await _ventaRepository.ObetenerInventario(detalle);
+                if (inventario != null)
+                {
+                    inventario.Stock += detalle.Cantidad; // Devuelves el stock // Devuelves el stock que se había llevado
+                }
+            }
+
+            await _ventaRepository.SaveChangesAsync();
+            return NoContent();
         }
     }
 }

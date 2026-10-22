@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SistemaInventario.DTO;
 using SistemaInventario.Models;
 using SistemaInventario.Repositories;
+using System.Security.Claims;
 
 namespace SistemaInventario.Controllers
 {
@@ -58,7 +60,7 @@ namespace SistemaInventario.Controllers
             return Ok(comprasDto);
         }
 
-        [HttpGet("id")]
+        [HttpGet("{id}")]
         public async Task<ActionResult<Compra>> getId(int id)
         {
             var compra = await _comprasRepository.GetId(id);
@@ -102,8 +104,19 @@ namespace SistemaInventario.Controllers
         [HttpPost("Registrar")]
         public async Task<IActionResult> RegistrarCompra([FromBody] CompraInsertDto dto)
         {
+            // 1. Extraes el ID del usuario logueado desde los Claims del Token JWT
+            var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+            // 2. Compruebas el estado actual en la Base de Datos (en tiempo real)
+            var usuarioActivo = await _comprasRepository.UsuarioActivoAsync(usuarioId);
+
+            if (!usuarioActivo)
+            {
+                return Unauthorized("Tu usuario ya no se encuentra activo en el sistema.");
+            }
+
             // 1. Validar que el JSON no venga vacío
-            if (dto == null || !dto.Detalles.Any())
+            if (dto == null || dto.Detalles.Count == 0)
             {
                 return BadRequest("La compra debe contener al menos un producto en el detalle.");
             }
@@ -118,21 +131,48 @@ namespace SistemaInventario.Controllers
                 }
             }
 
+            var claimUsuarioId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(claimUsuarioId))
+            {
+                return Unauthorized("No se pudo identificar al usuario logueado a través del token.");
+            }
+
+            int usuarioLogueadoId = int.Parse(claimUsuarioId);
+
+            if (!await _comprasRepository.ProveedorActivoAsync(dto.IdProveedor))
+            {
+                return BadRequest("El proveedor seleccionado no existe o se encuentra inactivo.");
+            }
+
             // 3. Mapear de forma limpia el DTO Maestro-Detalle hacia tus Entidades Reales de la BD
             var nuevaCompra = new Compra
             {
                 ComprobanteReferencia = dto.ComprobanteReferencia,
                 IdProveedor = dto.IdProveedor,
-                IdUsuarioRegistro = dto.IdUsuarioRegistro, // Vinculamos el usuario auditor
+                IdUsuarioRegistro = usuarioLogueadoId, // Vinculamos el usuario auditor
                 FechaCompra = DateTime.Now,
                 Estado = "Procesado",
                 // Calculamos el Total sumando los subtotales de forma matemática en memoria
-                Total = dto.Detalles.Sum(d => d.Cantidad * d.PrecioUnitario)
+                Total = dto.Detalles.Sum(d => d.Cantidad * d.PrecioUnitario),
             };
 
             // 4. Mapeamos la lista interna de detalles recorriendo el DTO de React
             foreach (var item in dto.Detalles)
             {
+                
+                // 🔒 Aduana del Almacén de destino
+                if (!await _comprasRepository.AlmacenActivoAsync(item.IdAlmacen))
+                {
+                    return BadRequest($"El almacén con ID {item.IdAlmacen} no existe o está inactivo.");
+                }
+
+                // 🔒 Aduana del Producto
+                if (!await _comprasRepository.ProductoActivoAsync(item.IdProducto))
+                {
+                    return BadRequest($"El producto con ID {item.IdProducto} no existe o está descontinuado.");
+                }
+
                 var detalleEntidad = new DetalleCompra
                 {
                     IdProducto = item.IdProducto,
@@ -156,6 +196,39 @@ namespace SistemaInventario.Controllers
                 return StatusCode(500, $"Error interno al procesar la logística: {ex.Message}");
             }
         }
+
+        [HttpDelete("{id}")]
+        public async Task<ActionResult> AnularCompra(int id)
+        {
+            // 1. Buscamos la compra con sus detalles cargados en memoria
+            var compra = await _comprasRepository.GetCompraConDetallesAsync(id);
+
+            if (compra == null) return NotFound("La compra no existe.");
+
+            if (compra.Estado == "Anulado") return BadRequest("Esta compra ya se encuentra anulada.");
+
+            // 2. Aplicamos el borrado lógico transaccional
+            compra.Estado = "Anulado";
+
+            // 3. 🔄 REVERSIÓN DE STOCK (Kardex): Restamos lo que compramos del inventario
+            foreach (var detalle in compra.DetalleCompras)
+            {
+                // Buscamos la fila exacta del stock cruzando el Producto y el Almacén de destino de ese detalle
+                var inventario = await _comprasRepository.GetInventarioAsync(detalle.IdProducto, detalle.IdAlmacen);
+
+                if (inventario != null)
+                {
+                    // Restamos la cantidad porque la compra se está cancelando y la mercadería "se devuelve"
+                    inventario.Stock -= detalle.Cantidad; // Ajusta 'Cantidad' según el nombre en tu BD (ej: StockActual)
+                }
+            }
+
+            // 4. Guardamos todos los cambios de golpe en SQL Server
+            await _comprasRepository.SaveChangesAsync();
+
+            return NoContent(); // Te devolverá un hermoso 204 en Postman
+        }
+
 
     }
 }

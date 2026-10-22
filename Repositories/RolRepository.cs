@@ -41,7 +41,8 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Rol rol)
         {
-            _context.Rols.Remove(rol);
+            rol.Estado = !rol.Estado;
+            _context.Rols.Update(rol);
             await _context.SaveChangesAsync();
         }
 

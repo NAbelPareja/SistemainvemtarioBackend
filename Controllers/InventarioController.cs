@@ -56,7 +56,7 @@ namespace SistemaInventario.Controllers
             return Ok(ListaInventario);
         }
 
-        [HttpPut]
+        [HttpPut("{Id}")]
         public async Task<ActionResult> UpdateInventario(int id,[FromBody] InventarioUpdateDto inventarioDto)
         {
             if (id != inventarioDto.Id)
@@ -66,6 +66,10 @@ namespace SistemaInventario.Controllers
             var InventarioExistente = await _inventarioRepository.ExistInventarioAsync(id);
 
             InventarioExistente.Stock = inventarioDto.Stock;
+ 
+ 
+            InventarioExistente.StockMinimo = inventarioDto.StockMinimo; // Solo si tu BD lo pide como string, si no, déjalo numérico
+
             InventarioExistente.UltimaActualizacion = DateTime.Now;
             await _inventarioRepository.Update();
             return Ok("Inventario actualizado correctamente");

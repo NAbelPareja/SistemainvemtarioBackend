@@ -17,7 +17,7 @@ namespace SistemaInventario.Controllers
         {
             _productoRepository = productoRepository;
         }
-        [HttpGet("Todos")]
+        [HttpGet()]
         public async Task<ActionResult<IEnumerable<ProductoDto>>> GetAllProductos()
         {
             var productos = await _productoRepository.GetAllProductosAsync();
@@ -79,14 +79,14 @@ namespace SistemaInventario.Controllers
                 return BadRequest("Ya existe un producto con ese nombre");
             }
             var existCategoria = await _productoRepository.ExistCategoriaAsync(producto.IdCategoria);
-            if (existCategoria == null)
+            if (existCategoria == null || existCategoria.Estado == false)
             {
-                return BadRequest("No existe la categoria");
+                return BadRequest("No existe la categoria o esta inactiva");
             }
             var ExistMarca = await _productoRepository.ExistMarcaAsync(producto.IdMarca);
-            if (ExistMarca == null)
+            if (ExistMarca == null || ExistMarca.Estado == false)
             {
-                return BadRequest("No existe la marca");
+                return BadRequest("No existe la marca o esta inactiva");
             }
 
             var newProducto = new Producto
@@ -96,7 +96,7 @@ namespace SistemaInventario.Controllers
                 Descripcion = producto.Descripcion,
                 PrecioCompra = producto.PrecioCompra,
                 PrecioVenta = producto.PrecioVenta,
-                Estado = producto.Estado,
+                Estado = true,
                 FechaCreacion = DateTime.Now,
                 IdCategoria = producto.IdCategoria,
                 IdMarca = producto.IdMarca
@@ -109,9 +109,9 @@ namespace SistemaInventario.Controllers
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]
         [HttpPut("Actualizar/{id}")]
-        public async Task<ActionResult> Update(int id, ProductoInsertDto producto)
+        public async Task<ActionResult> Update(int id, ProductoUpdateDto producto)
         {
-            if (id != producto.IdCategoria)
+            if (id != producto.Id)
             {
                 return BadRequest("El id del producto no coincide");
             }
@@ -135,31 +135,10 @@ namespace SistemaInventario.Controllers
             existProducto.Descripcion = producto.Descripcion;
             existProducto.PrecioCompra = producto.PrecioCompra;
             existProducto.PrecioVenta = producto.PrecioVenta;
-            existProducto.Estado = producto.Estado;
             existProducto.IdCategoria = producto.IdCategoria;
             existProducto.IdMarca = producto.IdMarca;
             await _productoRepository.UpdateProductoAsync(existProducto);
             return Ok("Producto actualizado correctamente");
-        }
-
-        [Authorize(Roles = "Administrador,Encargado Almacen")]
-        [HttpPut("Estado")]
-        public async Task<ActionResult> Update(int id, bool estado)
-        {
-            if (id <=0)
-            {
-                BadRequest("El valor ingresado no es valido");
-            }
-            var existProducto = await _productoRepository.ExistProductoAsync(id);
-            if (existProducto == null)
-            {
-                return NotFound("El Producto no existe.");
-            }
-
-            existProducto.Estado = estado;
-
-            await _productoRepository.UpdateProductoAsync(existProducto);
-            return NoContent();
         }
 
         [Authorize(Roles = "Administrador,Encargado Almacen")]

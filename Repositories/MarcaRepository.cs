@@ -40,7 +40,8 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Marca marca)
         {
-            _context.Marcas.Remove(marca);
+            marca.Estado = !marca.Estado;
+            _context.Marcas.Update(marca);
             await _context.SaveChangesAsync();
         }
     }

@@ -43,7 +43,7 @@ namespace SistemaInventario.Repositories
 
         public async Task DeleteAsync(Almacen almacen)
         {
-            almacen.Estado = false;
+            almacen.Estado = !almacen.Estado;
             _context.Almacens.Update(almacen);
             await _context.SaveChangesAsync();
         }
